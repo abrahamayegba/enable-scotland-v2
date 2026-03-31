@@ -1,15 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSites, getAssetInstances, getAssetTests, getNotifications, getReactiveJobs } from "@/lib/store";
-import type { Site, AssetInstance, AssetTest, Notification, ReactiveJob } from "@/lib/types";
+import {
+  getSites,
+  getAssetInstances,
+  getAssetTests,
+  getNotifications,
+  getReactiveJobs,
+} from "@/lib/store";
+import type {
+  Site,
+  AssetInstance,
+  AssetTest,
+  Notification,
+  ReactiveJob,
+} from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Building2,
   Package,
-  ClipboardCheck,
   XCircle,
   Bell,
   AlertTriangle,
@@ -21,7 +32,12 @@ import {
   HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow, isPast, isWithinInterval, addDays } from "date-fns";
+import {
+  formatDistanceToNow,
+  isPast,
+  isWithinInterval,
+  addDays,
+} from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import {
   BarChart,
@@ -62,19 +78,28 @@ export default function DashboardPage() {
   const passedTests = tests.filter((t) => t.result === "pass").length;
   const failedTests = tests.filter((t) => t.result === "fail").length;
 
-  // Assets with no test at all
+  // Assets with no test at all or overdue for testing
   const noTestAssets = instances.filter(
-    (i) => !i.lastTestResult || i.lastTestResult === "pending"
+    (i) =>
+      !i.lastTestResult ||
+      i.lastTestResult === "pending" ||
+      (i.nextTestDue && isPast(new Date(i.nextTestDue))),
   ).length;
 
   const overdueAssets = instances.filter(
-    (i) => i.nextTestDue && isPast(new Date(i.nextTestDue)) && i.lastTestResult !== "pending"
+    (i) =>
+      i.nextTestDue &&
+      isPast(new Date(i.nextTestDue)) &&
+      i.lastTestResult !== "pending",
   ).length;
 
   const dueSoon = instances.filter((i) => {
     if (!i.nextTestDue) return false;
     const due = new Date(i.nextTestDue);
-    return isWithinInterval(due, { start: new Date(), end: addDays(new Date(), 30) });
+    return isWithinInterval(due, {
+      start: new Date(),
+      end: addDays(new Date(), 30),
+    });
   }).length;
 
   const unreadNotifications = notifications.filter((n) => !n.read).length;
@@ -86,12 +111,24 @@ export default function DashboardPage() {
     .filter((s) => s.status === "active")
     .map((site) => {
       const siteInstances = instances.filter((i) => i.siteId === site.id);
-      const pass = siteInstances.filter((i) => i.lastTestResult === "pass").length;
-      const fail = siteInstances.filter((i) => i.lastTestResult === "fail").length;
-      const noTest = siteInstances.filter(
-        (i) => !i.lastTestResult || i.lastTestResult === "pending"
+      const pass = siteInstances.filter(
+        (i) => i.lastTestResult === "pass",
       ).length;
-      const shortName = site.name.replace(/ (Supported Living|Care Home|Day Centre|Resource Centre|Residential|Hub|Crown House)$/i, "").slice(0, 14);
+      const fail = siteInstances.filter(
+        (i) => i.lastTestResult === "fail",
+      ).length;
+      const noTest = siteInstances.filter(
+        (i) =>
+          !i.lastTestResult ||
+          i.lastTestResult === "pending" ||
+          (i.nextTestDue && isPast(new Date(i.nextTestDue))),
+      ).length;
+      const shortName = site.name
+        .replace(
+          / (Supported Living|Care Home|Day Centre|Resource Centre|Residential|Hub|Crown House)$/i,
+          "",
+        )
+        .slice(0, 14);
       return { site: shortName, pass, fail, noTest };
     });
 
@@ -107,7 +144,11 @@ export default function DashboardPage() {
 
   // Assets needing attention
   const assetsNeedingAttention = instances
-    .filter((i) => i.lastTestResult === "fail" || (i.nextTestDue && isPast(new Date(i.nextTestDue))))
+    .filter(
+      (i) =>
+        i.lastTestResult === "fail" ||
+        (i.nextTestDue && isPast(new Date(i.nextTestDue))),
+    )
     .slice(0, 5);
 
   return (
@@ -118,7 +159,8 @@ export default function DashboardPage() {
           Good {getTimeOfDay()}, {user?.name.split(" ")[0]}
         </h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Here&apos;s an overview of Enable Scotland&apos;s asset compliance status.
+          Here&apos;s an overview of Enable Scotland&apos;s asset compliance
+          status.
         </p>
       </div>
 
@@ -141,7 +183,7 @@ export default function DashboardPage() {
           sub="across all sites"
         />
         <KpiCard
-          title="Asset Tests Passed"
+          title="Assets - Passed"
           value={passedTests}
           icon={CheckCircle2}
           color="green"
@@ -149,7 +191,7 @@ export default function DashboardPage() {
           sub={`${tests.length} total tests`}
         />
         <KpiCard
-          title="Asset Tests Failed"
+          title="Assets - Failed"
           value={failedTests}
           icon={XCircle}
           color="red"
@@ -173,9 +215,13 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 border border-red-200">
               <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
               <p className="text-sm text-red-800 font-medium">
-                {overdueAssets} asset{overdueAssets > 1 ? "s are" : " is"} overdue for testing.
+                {overdueAssets} asset{overdueAssets > 1 ? "s are" : " is"}{" "}
+                overdue for testing.
               </p>
-              <Link href="/assets" className="ml-auto text-xs text-red-700 hover:underline flex items-center gap-1">
+              <Link
+                href="/assets"
+                className="ml-auto text-xs text-red-700 hover:underline flex items-center gap-1"
+              >
                 View <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -184,9 +230,13 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200">
               <Clock className="w-4 h-4 text-amber-600 shrink-0" />
               <p className="text-sm text-amber-800 font-medium">
-                {dueSoon} asset{dueSoon > 1 ? "s" : ""} due for testing within the next 30 days.
+                {dueSoon} asset{dueSoon > 1 ? "s" : ""} due for testing within
+                the next 30 days.
               </p>
-              <Link href="/assets" className="ml-auto text-xs text-amber-700 hover:underline flex items-center gap-1">
+              <Link
+                href="/assets"
+                className="ml-auto text-xs text-amber-700 hover:underline flex items-center gap-1"
+              >
                 View <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -199,19 +249,54 @@ export default function DashboardPage() {
         {/* Combo bar chart: tests by site */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Asset Test Status by Site</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Asset Test Status by Site
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={siteChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="site" tick={{ fontSize: 10 }} width={90} />
+              <BarChart
+                data={siteChartData}
+                margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
+                layout="vertical"
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f0f0f0"
+                  horizontal={false}
+                />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11 }}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="site"
+                  tick={{ fontSize: 10 }}
+                  width={90}
+                />
                 <Tooltip />
-                <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="pass" stackId="a" fill={GREEN} name="Pass" radius={[0, 0, 0, 0]} />
+                <Legend
+                  iconSize={10}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 11 }}
+                />
+                <Bar
+                  dataKey="pass"
+                  stackId="a"
+                  fill={GREEN}
+                  name="Pass"
+                  radius={[0, 0, 0, 0]}
+                />
                 <Bar dataKey="fail" stackId="a" fill={RED} name="Fail" />
-                <Bar dataKey="noTest" stackId="a" fill={AMBER} name="No Test" radius={[0, 4, 4, 0]} />
+                <Bar
+                  dataKey="noTest"
+                  stackId="a"
+                  fill={AMBER}
+                  name="No Test"
+                  radius={[0, 4, 4, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -220,7 +305,9 @@ export default function DashboardPage() {
         {/* Pie chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Overall Pass / Fail / No Test</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Overall Pass / Fail / No Test
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-center">
             <ResponsiveContainer width="100%" height={240}>
@@ -260,7 +347,11 @@ export default function DashboardPage() {
               )}
             </CardTitle>
             <Link href="/reactive-jobs">
-              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-[var(--brand-purple)]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2 text-[var(--brand-purple)]"
+              >
                 Manage <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </Link>
@@ -282,16 +373,23 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors">
                       <Zap className="w-4 h-4 text-[var(--brand-purple)] shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium truncate">{job.title}</p>
-                        <p className="text-[10px] text-muted-foreground">{site?.name}</p>
+                        <p className="text-xs font-medium truncate">
+                          {job.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {site?.name}
+                        </p>
                       </div>
                       {job.source === "portal" && (
                         <span className="text-[10px] text-[var(--brand-purple)] bg-[var(--brand-purple)]/10 px-1.5 py-0.5 rounded font-medium shrink-0">
                           Portal
                         </span>
                       )}
-                      <span className={`text-[10px] border px-1.5 py-0.5 rounded font-medium shrink-0 ${priorityColors[job.priority]}`}>
-                        {job.priority.charAt(0).toUpperCase() + job.priority.slice(1)}
+                      <span
+                        className={`text-[10px] border px-1.5 py-0.5 rounded font-medium shrink-0 ${priorityColors[job.priority]}`}
+                      >
+                        {job.priority.charAt(0).toUpperCase() +
+                          job.priority.slice(1)}
                       </span>
                     </div>
                   </Link>
@@ -306,9 +404,15 @@ export default function DashboardPage() {
         {/* Assets needing attention */}
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold">Assets Needing Attention</CardTitle>
+            <CardTitle className="text-sm font-semibold">
+              Assets Needing Attention
+            </CardTitle>
             <Link href="/assets">
-              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-[var(--brand-purple)]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2 text-[var(--brand-purple)]"
+              >
                 View all <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </Link>
@@ -321,17 +425,25 @@ export default function DashboardPage() {
               </div>
             ) : (
               assetsNeedingAttention.map((asset) => {
-                const isOverdue = asset.nextTestDue && isPast(new Date(asset.nextTestDue));
+                const isOverdue =
+                  asset.nextTestDue && isPast(new Date(asset.nextTestDue));
                 return (
-                  <div key={asset.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-muted/20">
+                  <div
+                    key={asset.id}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-muted/20"
+                  >
                     {asset.lastTestResult === "fail" ? (
                       <XCircle className="w-4 h-4 text-red-500 shrink-0" />
                     ) : (
                       <Clock className="w-4 h-4 text-amber-500 shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{asset.serialNumber}</p>
-                      <p className="text-[10px] text-muted-foreground">{asset.location}</p>
+                      <p className="text-xs font-medium truncate">
+                        {asset.serialNumber}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {asset.location}
+                      </p>
                     </div>
                     <Badge
                       variant="outline"
@@ -356,26 +468,39 @@ export default function DashboardPage() {
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               Recent Notifications
               {unreadNotifications > 0 && (
-                <Badge className="bg-red-500 text-white border-0 text-[10px] px-1.5">{unreadNotifications}</Badge>
+                <Badge className="bg-red-500 text-white border-0 text-[10px] px-1.5">
+                  {unreadNotifications}
+                </Badge>
               )}
             </CardTitle>
             <Link href="/notifications">
-              <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-[var(--brand-purple)]">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2 text-[var(--brand-purple)]"
+              >
                 View all <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {recentNotifications.map((n) => (
-              <div key={n.id} className={`flex items-start gap-3 px-3 py-2 rounded-lg border ${n.read ? "border-border/40 bg-transparent" : "border-[var(--brand-purple)]/20 bg-accent/30"}`}>
+              <div
+                key={n.id}
+                className={`flex items-start gap-3 px-3 py-2 rounded-lg border ${n.read ? "border-border/40 bg-transparent" : "border-[var(--brand-purple)]/20 bg-accent/30"}`}
+              >
                 <NotificationIcon type={n.type} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{n.title}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(n.createdAt), {
+                      addSuffix: true,
+                    })}
                   </p>
                 </div>
-                {!n.read && <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-purple)] mt-1 shrink-0" />}
+                {!n.read && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-purple)] mt-1 shrink-0" />
+                )}
               </div>
             ))}
           </CardContent>
@@ -413,7 +538,9 @@ function KpiCard({
         <CardContent className="flex flex-col gap-3 pt-5 pb-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">{title}</p>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorMap[color]}`}>
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorMap[color]}`}
+            >
               <Icon className="w-4 h-4" />
             </div>
           </div>
@@ -428,11 +555,17 @@ function KpiCard({
 }
 
 function NotificationIcon({ type }: { type: string }) {
-  if (type === "test_failed") return <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />;
-  if (type === "test_passed") return <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />;
-  if (type === "test_overdue") return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />;
-  if (type === "supplier_insurance_expired") return <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />;
-  return <Bell className="w-4 h-4 text-[var(--brand-purple)] shrink-0 mt-0.5" />;
+  if (type === "test_failed")
+    return <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />;
+  if (type === "test_passed")
+    return <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />;
+  if (type === "test_overdue")
+    return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />;
+  if (type === "supplier_insurance_expired")
+    return <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />;
+  return (
+    <Bell className="w-4 h-4 text-[var(--brand-purple)] shrink-0 mt-0.5" />
+  );
 }
 
 function getTimeOfDay() {

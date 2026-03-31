@@ -113,10 +113,13 @@ export default function AssetsPage() {
       site?.name.toLowerCase().includes(q);
     const matchSite = siteFilter === "all" || i.siteId === siteFilter;
     const matchType = typeFilter === "all" || i.assetTypeId === typeFilter;
+    // For result filter: if overdue, treat as "pending"; otherwise use actual result
+    const isOverdue = i.nextTestDue && isPast(new Date(i.nextTestDue));
+    const effectiveResult = isOverdue ? "pending" : i.lastTestResult;
     const matchResult =
       resultFilter === "all" ||
-      i.lastTestResult === resultFilter ||
-      (!i.lastTestResult && resultFilter === "pending");
+      effectiveResult === resultFilter ||
+      (!effectiveResult && resultFilter === "pending");
     return matchSearch && matchSite && matchType && matchResult;
   });
 
@@ -243,7 +246,10 @@ export default function AssetsPage() {
                         const isOverdue =
                           instance.nextTestDue &&
                           isPast(new Date(instance.nextTestDue));
-                        const result = instance.lastTestResult ?? "pending";
+                        // If overdue, treat as "pending" (no test), otherwise use actual result
+                        const result = isOverdue
+                          ? "pending"
+                          : (instance.lastTestResult ?? "pending");
                         const rc =
                           RESULT_CONFIG[result as keyof typeof RESULT_CONFIG] ??
                           RESULT_CONFIG.pending;
@@ -262,7 +268,9 @@ export default function AssetsPage() {
                               <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
                                 <Clock className="w-2.5 h-2.5 shrink-0" />
                                 <span className="font-mono font-semibold">
-                                  {type ? `${type.testingIntervalMonths}M` : "—"}
+                                  {type
+                                    ? `${type.testingIntervalMonths}M`
+                                    : "—"}
                                 </span>
                                 <span className="text-border">·</span>
                                 <MapPin className="w-2.5 h-2.5 shrink-0" />
@@ -282,7 +290,10 @@ export default function AssetsPage() {
                             <td className="px-4 py-2.5 hidden md:table-cell">
                               <span className="text-xs text-muted-foreground">
                                 {instance.lastTestDate
-                                  ? format(new Date(instance.lastTestDate), "dd MMM yyyy")
+                                  ? format(
+                                      new Date(instance.lastTestDate),
+                                      "dd MMM yyyy",
+                                    )
                                   : "Never"}
                               </span>
                             </td>
@@ -308,10 +319,15 @@ export default function AssetsPage() {
                                 >
                                   {isOverdue
                                     ? `Overdue · ${format(new Date(instance.nextTestDue), "dd MMM yyyy")}`
-                                    : format(new Date(instance.nextTestDue), "dd MMM yyyy")}
+                                    : format(
+                                        new Date(instance.nextTestDue),
+                                        "dd MMM yyyy",
+                                      )}
                                 </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">—</span>
+                                <span className="text-xs text-muted-foreground">
+                                  —
+                                </span>
                               )}
                             </td>
                             <td
@@ -321,20 +337,28 @@ export default function AssetsPage() {
                               {isAdmin && (
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="w-7 h-7">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="w-7 h-7"
+                                    >
                                       <MoreHorizontal className="w-3.5 h-3.5" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setEditInstance(instance)}>
-                                      <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                    <DropdownMenuItem
+                                      onClick={() => setEditInstance(instance)}
+                                    >
+                                      <Pencil className="w-3.5 h-3.5 mr-2" />{" "}
+                                      Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="text-destructive"
                                       onClick={() => setDeleteId(instance.id)}
                                     >
-                                      <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                                      <Trash2 className="w-3.5 h-3.5 mr-2" />{" "}
+                                      Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>

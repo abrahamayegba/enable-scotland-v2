@@ -180,7 +180,7 @@ export default function LoginPage() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Jacquie (H&S):</span>
+                  <span className="text-muted-foreground">Jacquie (ICT):</span>
                   <button
                     type="button"
                     className="text-[var(--brand-purple)] hover:underline font-mono"

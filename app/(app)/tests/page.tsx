@@ -9,7 +9,6 @@ import {
   getAssetTypes,
   getSites,
   generateId,
-  getCurrentUser,
 } from "@/lib/store";
 import type {
   AssetTest,
@@ -65,8 +64,6 @@ import {
   FileText,
   Image as ImageIcon,
   ChevronDown,
-  Filter,
-  Calendar,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
