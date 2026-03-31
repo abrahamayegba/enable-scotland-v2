@@ -1,0 +1,300 @@
+"use client";
+
+import type {
+  User,
+  Site,
+  AssetType,
+  AssetInstance,
+  AssetTest,
+  Notification,
+  AuthSession,
+  ReactiveJob,
+  SupplyChainCompany,
+} from "./types";
+import {
+  DEMO_USERS,
+  DEMO_SITES,
+  DEMO_ASSET_TYPES,
+  DEMO_ASSET_INSTANCES,
+  DEMO_ASSET_TESTS,
+  DEMO_NOTIFICATIONS,
+  DEMO_REACTIVE_JOBS,
+  DEMO_SUPPLY_CHAIN,
+} from "./demo-data";
+
+// ─── Storage Keys ─────────────────────────────────────────────────────────────
+const KEYS = {
+  USERS: "es_users",
+  SITES: "es_sites",
+  ASSET_TYPES: "es_asset_types",
+  ASSET_INSTANCES: "es_asset_instances",
+  ASSET_TESTS: "es_asset_tests",
+  NOTIFICATIONS: "es_notifications",
+  REACTIVE_JOBS: "es_reactive_jobs",
+  SUPPLY_CHAIN: "es_supply_chain",
+  SESSION: "es_session",
+  SEEDED: "es_seeded",
+};
+
+const SEED_VERSION = "v3"; // bump this to reseed all demo data
+
+// ─── Seed ─────────────────────────────────────────────────────────────────────
+export function seedIfNeeded(): void {
+  if (typeof window === "undefined") return;
+  const seeded = localStorage.getItem(KEYS.SEEDED);
+  if (seeded === SEED_VERSION) return;
+
+  localStorage.setItem(KEYS.USERS, JSON.stringify(DEMO_USERS));
+  localStorage.setItem(KEYS.SITES, JSON.stringify(DEMO_SITES));
+  localStorage.setItem(KEYS.ASSET_TYPES, JSON.stringify(DEMO_ASSET_TYPES));
+  localStorage.setItem(KEYS.ASSET_INSTANCES, JSON.stringify(DEMO_ASSET_INSTANCES));
+  localStorage.setItem(KEYS.ASSET_TESTS, JSON.stringify(DEMO_ASSET_TESTS));
+  localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(DEMO_NOTIFICATIONS));
+  localStorage.setItem(KEYS.REACTIVE_JOBS, JSON.stringify(DEMO_REACTIVE_JOBS));
+  localStorage.setItem(KEYS.SUPPLY_CHAIN, JSON.stringify(DEMO_SUPPLY_CHAIN));
+  localStorage.setItem(KEYS.SEEDED, SEED_VERSION);
+}
+
+// ─── Generic helpers ──────────────────────────────────────────────────────────
+function getAll<T>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "[]") as T[];
+  } catch {
+    return [];
+  }
+}
+
+function setAll<T>(key: string, data: T[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+export function getUsers(): User[] {
+  return getAll<User>(KEYS.USERS);
+}
+
+export function saveUser(user: User): void {
+  const users = getUsers();
+  const idx = users.findIndex((u) => u.id === user.id);
+  if (idx >= 0) users[idx] = user;
+  else users.push(user);
+  setAll(KEYS.USERS, users);
+}
+
+export function deleteUser(userId: string): void {
+  const users = getUsers().filter((u) => u.id !== userId);
+  setAll(KEYS.USERS, users);
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+export function getSession(): AuthSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.SESSION) ?? "null") as AuthSession | null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSession(session: AuthSession | null): void {
+  if (typeof window === "undefined") return;
+  if (session) {
+    localStorage.setItem(KEYS.SESSION, JSON.stringify(session));
+  } else {
+    localStorage.removeItem(KEYS.SESSION);
+  }
+}
+
+export function login(email: string, password: string): User | null {
+  const users = getUsers();
+  const user = users.find(
+    (u) => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === password && u.isActive
+  );
+  if (!user) return null;
+  // Update last login
+  user.lastLogin = new Date().toISOString();
+  saveUser(user);
+  setSession({ userId: user.id, role: user.role });
+  return user;
+}
+
+export function logout(): void {
+  setSession(null);
+}
+
+export function getCurrentUser(): User | null {
+  const session = getSession();
+  if (!session) return null;
+  const users = getUsers();
+  return users.find((u) => u.id === session.userId) ?? null;
+}
+
+// ─── Sites ────────────────────────────────────────────────────────────────────
+export function getSites(): Site[] {
+  return getAll<Site>(KEYS.SITES);
+}
+
+export function saveSite(site: Site): void {
+  const sites = getSites();
+  const idx = sites.findIndex((s) => s.id === site.id);
+  if (idx >= 0) sites[idx] = site;
+  else sites.push(site);
+  setAll(KEYS.SITES, sites);
+}
+
+export function deleteSite(siteId: string): void {
+  const sites = getSites().filter((s) => s.id !== siteId);
+  setAll(KEYS.SITES, sites);
+}
+
+// ─── Asset Types ──────────────────────────────────────────────────────────────
+export function getAssetTypes(): AssetType[] {
+  return getAll<AssetType>(KEYS.ASSET_TYPES);
+}
+
+export function saveAssetType(at: AssetType): void {
+  const types = getAssetTypes();
+  const idx = types.findIndex((t) => t.id === at.id);
+  if (idx >= 0) types[idx] = at;
+  else types.push(at);
+  setAll(KEYS.ASSET_TYPES, types);
+}
+
+export function deleteAssetType(id: string): void {
+  const types = getAssetTypes().filter((t) => t.id !== id);
+  setAll(KEYS.ASSET_TYPES, types);
+}
+
+// ─── Asset Instances ──────────────────────────────────────────────────────────
+export function getAssetInstances(): AssetInstance[] {
+  return getAll<AssetInstance>(KEYS.ASSET_INSTANCES);
+}
+
+export function saveAssetInstance(ai: AssetInstance): void {
+  const instances = getAssetInstances();
+  const idx = instances.findIndex((i) => i.id === ai.id);
+  if (idx >= 0) instances[idx] = ai;
+  else instances.push(ai);
+  setAll(KEYS.ASSET_INSTANCES, instances);
+}
+
+export function deleteAssetInstance(id: string): void {
+  const instances = getAssetInstances().filter((i) => i.id !== id);
+  setAll(KEYS.ASSET_INSTANCES, instances);
+}
+
+// ─── Asset Tests ──────────────────────────────────────────────────────────────
+export function getAssetTests(): AssetTest[] {
+  return getAll<AssetTest>(KEYS.ASSET_TESTS);
+}
+
+export function saveAssetTest(test: AssetTest): void {
+  const tests = getAssetTests();
+  const idx = tests.findIndex((t) => t.id === test.id);
+  if (idx >= 0) tests[idx] = test;
+  else tests.push(test);
+  setAll(KEYS.ASSET_TESTS, tests);
+  // Update the asset instance's lastTestDate and result
+  const instances = getAssetInstances();
+  const instanceIdx = instances.findIndex((i) => i.id === test.assetInstanceId);
+  if (instanceIdx >= 0) {
+    instances[instanceIdx].lastTestDate = test.testDate;
+    instances[instanceIdx].lastTestResult = test.result;
+    instances[instanceIdx].nextTestDue = test.nextTestDate;
+    setAll(KEYS.ASSET_INSTANCES, instances);
+  }
+}
+
+export function deleteAssetTest(id: string): void {
+  const tests = getAssetTests().filter((t) => t.id !== id);
+  setAll(KEYS.ASSET_TESTS, tests);
+}
+
+// ─── Notifications ───────────────────────────��────────────────────────────────
+export function getNotifications(): Notification[] {
+  return getAll<Notification>(KEYS.NOTIFICATIONS).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function markNotificationRead(id: string): void {
+  const notifications = getNotifications();
+  const idx = notifications.findIndex((n) => n.id === id);
+  if (idx >= 0) {
+    notifications[idx].read = true;
+    setAll(KEYS.NOTIFICATIONS, notifications);
+  }
+}
+
+export function markAllNotificationsRead(): void {
+  const notifications = getNotifications().map((n) => ({ ...n, read: true }));
+  setAll(KEYS.NOTIFICATIONS, notifications);
+}
+
+export function addNotification(notification: Notification): void {
+  const notifications = getNotifications();
+  notifications.unshift(notification);
+  setAll(KEYS.NOTIFICATIONS, notifications);
+}
+
+// ─── ID generation ────────────────────────────────────────────────────────────
+export function generateId(prefix: string): string {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// ─── Reactive Jobs ────────────────────────────────────────────────────────────
+export function getReactiveJobs(): ReactiveJob[] {
+  return getAll<ReactiveJob>(KEYS.REACTIVE_JOBS).sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+}
+
+export function saveReactiveJob(job: ReactiveJob): void {
+  const jobs = getReactiveJobs();
+  const idx = jobs.findIndex((j) => j.id === job.id);
+  if (idx >= 0) jobs[idx] = job;
+  else jobs.push(job);
+  setAll(KEYS.REACTIVE_JOBS, jobs);
+}
+
+export function deleteReactiveJob(id: string): void {
+  const jobs = getReactiveJobs().filter((j) => j.id !== id);
+  setAll(KEYS.REACTIVE_JOBS, jobs);
+}
+
+// Public portal submission — no auth required, creates job with source="portal"
+export function submitPortalJob(job: ReactiveJob): void {
+  saveReactiveJob(job);
+  // Auto-create a notification for admins
+  addNotification({
+    id: generateId("ntf"),
+    type: "job_created",
+    title: `New Job Submitted: ${job.title}`,
+    message: `A reactive job was submitted via the portal by ${job.contactName ?? job.createdBy}.`,
+    read: false,
+    createdAt: new Date().toISOString(),
+    linkTo: "/reactive-jobs",
+  });
+}
+
+// ─── Supply Chain ─────────────────────────────────────────────────────────────
+export function getSupplyChain(): SupplyChainCompany[] {
+  return getAll<SupplyChainCompany>(KEYS.SUPPLY_CHAIN).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+}
+
+export function saveSupplyChainCompany(company: SupplyChainCompany): void {
+  const companies = getSupplyChain();
+  const idx = companies.findIndex((c) => c.id === company.id);
+  if (idx >= 0) companies[idx] = company;
+  else companies.push(company);
+  setAll(KEYS.SUPPLY_CHAIN, companies);
+}
+
+export function deleteSupplyChainCompany(id: string): void {
+  const companies = getSupplyChain().filter((c) => c.id !== id);
+  setAll(KEYS.SUPPLY_CHAIN, companies);
+}
