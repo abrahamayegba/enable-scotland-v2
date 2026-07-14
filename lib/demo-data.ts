@@ -76,6 +76,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "fair",
     createdAt: "2024-01-15T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -135,6 +136,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "good",
     createdAt: "2024-01-15T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -194,6 +196,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "good",
     createdAt: "2024-01-20T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -238,6 +241,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "fair",
     createdAt: "2024-02-01T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -281,6 +285,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "poor",
     createdAt: "2024-02-10T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -332,6 +337,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "critical",
     createdAt: "2024-02-15T09:00:00Z",
     syncedFromSimpro: false,
     attachments: [
@@ -367,6 +373,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "active",
+    condition: "good",
     createdAt: "2024-03-01T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [
@@ -418,6 +425,7 @@ export const DEMO_SITES: Site[] = [
       },
     ],
     status: "inactive",
+    condition: "poor",
     createdAt: "2024-03-10T09:00:00Z",
     syncedFromSimpro: true,
     attachments: [

@@ -321,6 +321,31 @@ export default function SitesPage() {
         )}
       </div>
 
+      {/* Condition summary strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {(["good", "fair", "poor", "critical"] as const).map((c) => {
+          const count = sites.filter((s) => s.condition === c).length;
+          const cfg = CONDITION_CONFIG[c];
+          return (
+            <button
+              key={c}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-lg border text-left transition-all ${
+                conditionFilter === c
+                  ? `${cfg.badge} border-current`
+                  : "bg-card border-border hover:bg-muted/40"
+              }`}
+              onClick={() => setConditionFilter(conditionFilter === c ? "all" : c)}
+            >
+              <Activity className={`w-4 h-4 shrink-0 ${conditionFilter === c ? "" : "text-muted-foreground"}`} />
+              <div>
+                <p className="text-lg font-bold leading-none">{count}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{cfg.label}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((site) => {
           const siteAssets = instances.filter(
