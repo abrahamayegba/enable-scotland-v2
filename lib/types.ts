@@ -43,6 +43,7 @@ export interface Site {
   // Multiple contacts support
   contacts?: SiteContact[];
   status: "active" | "inactive";
+  condition?: "good" | "fair" | "poor" | "critical";
   createdAt: string;
   syncedFromSimpro?: boolean;
   attachments?: SiteAttachment[];
@@ -155,6 +156,69 @@ export interface SiteAttachment {
   url: string; // opens in new tab (fake URL for demo)
   type: string; // e.g. "Lease Agreement", "Risk Assessment"
   uploadedAt: string;
+}
+
+// ─── Approvals ────────────────────────────────────────────────────────────────
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+export type ApprovalCategory =
+  | "document"
+  | "maintenance"
+  | "lease"
+  | "compliance"
+  | "procurement"
+  | "other";
+
+export interface ApprovalRequest {
+  id: string;
+  title: string;
+  description: string;
+  category: ApprovalCategory;
+  status: ApprovalStatus;
+  requestedBy: string;
+  requestedByUserId: string;
+  assignedTo?: string; // name of approver
+  siteId?: string;
+  dueDate?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+export type ActivityAction =
+  | "created"
+  | "updated"
+  | "status_changed"
+  | "assigned"
+  | "note_added"
+  | "attachment_added"
+  | "attachment_removed"
+  | "closed"
+  | "approved"
+  | "rejected";
+
+export interface ActivityLogEntry {
+  id: string;
+  entityType: "reactive_job" | "asset_test" | "approval";
+  entityId: string;
+  action: ActivityAction;
+  description: string;
+  performedBy: string;
+  performedByUserId: string;
+  createdAt: string;
+  metadata?: Record<string, string>;
+}
+
+// ─── Notification / Escalation Preferences ────────────────────────────────────
+export interface EscalationPreferences {
+  testDueLeadDays: number;       // days before test due to send first alert
+  testOverdueRepeatDays: number; // how often to repeat overdue alerts
+  leaseDueLeadDays: number;      // days before lease expiry to alert
+  complianceDueLeadDays: number; // days before compliance renewal to alert
+  emailNotifications: boolean;
+  portalNotifications: boolean;
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

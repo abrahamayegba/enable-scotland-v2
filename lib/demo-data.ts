@@ -7,6 +7,7 @@ import type {
   Notification,
   ReactiveJob,
   SupplyChainCompany,
+  ApprovalRequest,
 } from "./types";
 
 // ─── Demo Users ───────────────────────────────────────────────────────────────
@@ -2309,5 +2310,103 @@ export const DEMO_SUPPLY_CHAIN: SupplyChainCompany[] = [
     insuranceExpiryDate: "2026-12-31",
     status: "active",
     createdAt: "2024-03-15T09:00:00Z",
+  },
+];
+
+// ─── Demo Approvals ───────────────────────────────────────────────────────────
+export const DEMO_APPROVALS: ApprovalRequest[] = [
+  {
+    id: "appr_001",
+    title: "Roof Repair Quote Approval — Govan Road",
+    description:
+      "Scottish Roofing Ltd have submitted a quote of £4,200 for emergency roof repairs at Govan Road Supported Living. Approval required before works can proceed.",
+    category: "procurement",
+    status: "pending",
+    requestedBy: "Rachel Doyle",
+    requestedByUserId: "usr_001",
+    assignedTo: "Stuart Mcmillan",
+    siteId: "site_001",
+    dueDate: "2026-07-20T00:00:00Z",
+    createdAt: "2026-07-10T09:30:00Z",
+    updatedAt: "2026-07-10T09:30:00Z",
+  },
+  {
+    id: "appr_002",
+    title: "Lease Renewal Sign-Off — Maryhill Resource Centre",
+    description:
+      "The 5-year lease at Maryhill Resource Centre is due for renewal in September. Legal have reviewed the terms and approval is required to proceed with signing.",
+    category: "lease",
+    status: "pending",
+    requestedBy: "Jacquie Anderson",
+    requestedByUserId: "usr_003",
+    assignedTo: "Rachel Doyle",
+    siteId: "site_003",
+    dueDate: "2026-08-01T00:00:00Z",
+    createdAt: "2026-07-08T14:00:00Z",
+    updatedAt: "2026-07-08T14:00:00Z",
+  },
+  {
+    id: "appr_003",
+    title: "Annual Fire Risk Assessment Review — All Sites",
+    description:
+      "The updated fire risk assessments for all 12 active sites have been completed by SafeGuard FM. Management sign-off required before filing and distribution.",
+    category: "compliance",
+    status: "approved",
+    requestedBy: "Stuart Mcmillan",
+    requestedByUserId: "usr_002",
+    assignedTo: "Rachel Doyle",
+    dueDate: "2026-06-30T00:00:00Z",
+    resolvedAt: "2026-06-25T11:00:00Z",
+    resolvedBy: "Rachel Doyle",
+    resolutionNotes: "Reviewed and approved. Documents filed in the compliance register.",
+    createdAt: "2026-06-15T10:00:00Z",
+    updatedAt: "2026-06-25T11:00:00Z",
+  },
+  {
+    id: "appr_004",
+    title: "New Supplier Onboarding — Caledonian Lift Services",
+    description:
+      "Caledonian Lift Services have submitted all required insurance and certification documents. Approval needed to add them to the approved supplier register.",
+    category: "procurement",
+    status: "pending",
+    requestedBy: "Jacquie Anderson",
+    requestedByUserId: "usr_003",
+    assignedTo: "Stuart Mcmillan",
+    dueDate: "2026-07-25T00:00:00Z",
+    createdAt: "2026-07-12T09:00:00Z",
+    updatedAt: "2026-07-12T09:00:00Z",
+  },
+  {
+    id: "appr_005",
+    title: "Emergency HVAC Replacement — Forth Valley Hub",
+    description:
+      "The main HVAC unit at Forth Valley Hub has failed. MacRae Mechanical Engineering have provided an emergency quote of £8,750. Urgent approval required.",
+    category: "maintenance",
+    status: "rejected",
+    requestedBy: "Rachel Doyle",
+    requestedByUserId: "usr_001",
+    assignedTo: "Stuart Mcmillan",
+    siteId: "site_006",
+    dueDate: "2026-07-05T00:00:00Z",
+    resolvedAt: "2026-07-04T16:00:00Z",
+    resolvedBy: "Stuart Mcmillan",
+    resolutionNotes: "Quote is too high. Please get a second quote from an alternative supplier before resubmitting.",
+    createdAt: "2026-07-03T08:00:00Z",
+    updatedAt: "2026-07-04T16:00:00Z",
+  },
+  {
+    id: "appr_006",
+    title: "Document Upload Authorisation — Lothian Road Contracts",
+    description:
+      "New service contracts for Lothian Road Day Centre have been uploaded. Finance approval needed before contracts are marked as active in the system.",
+    category: "document",
+    status: "pending",
+    requestedBy: "Stuart Mcmillan",
+    requestedByUserId: "usr_002",
+    assignedTo: "Jacquie Anderson",
+    siteId: "site_002",
+    dueDate: "2026-07-18T00:00:00Z",
+    createdAt: "2026-07-11T13:30:00Z",
+    updatedAt: "2026-07-11T13:30:00Z",
   },
 ];

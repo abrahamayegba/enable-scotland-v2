@@ -8,7 +8,7 @@ import {
   getAssetInstances,
   generateId,
 } from "@/lib/store";
-import type { Site, SiteContact } from "@/lib/types";
+import type { Site, SiteContact, SiteAttachment } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,18 @@ import {
   FileText,
   Paperclip,
   ExternalLink,
+  Download,
+  Calendar,
+  Activity,
 } from "lucide-react";
+import { format, subMonths, isAfter, isBefore, startOfDay, endOfDay } from "date-fns";
+
+const CONDITION_CONFIG = {
+  good: { label: "Good", badge: "border-green-200 text-green-700 bg-green-50" },
+  fair: { label: "Fair", badge: "border-amber-200 text-amber-700 bg-amber-50" },
+  poor: { label: "Poor", badge: "border-orange-200 text-orange-700 bg-orange-50" },
+  critical: { label: "Critical", badge: "border-red-200 text-red-700 bg-red-50" },
+} as const;
 
 type SyncStep = { label: string; done: boolean; active: boolean };
 
@@ -71,6 +82,10 @@ export default function SitesPage() {
   const [search, setSearch] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [conditionFilter, setConditionFilter] = useState("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState("all"); // "all" | "last30" | "last90" | "last180" | "last365" | "custom"
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editSite, setEditSite] = useState<Site | null>(null);
   const [deleteSiteId, setDeleteSiteId] = useState<string | null>(null);
@@ -93,6 +108,15 @@ export default function SitesPage() {
 
   const regions = [...new Set(sites.map((s) => s.region))].sort();
 
+  // Compute date cutoff for preset ranges
+  const dateCutoff: Date | null = (() => {
+    if (dateRangeFilter === "last30") return subMonths(new Date(), 1);
+    if (dateRangeFilter === "last90") return subMonths(new Date(), 3);
+    if (dateRangeFilter === "last180") return subMonths(new Date(), 6);
+    if (dateRangeFilter === "last365") return subMonths(new Date(), 12);
+    return null;
+  })();
+
   const filtered = sites.filter((s) => {
     const q = search.toLowerCase();
     const matchSearch =
@@ -103,8 +127,54 @@ export default function SitesPage() {
       s.primaryContact.toLowerCase().includes(q);
     const matchRegion = regionFilter === "all" || s.region === regionFilter;
     const matchStatus = statusFilter === "all" || s.status === statusFilter;
-    return matchSearch && matchRegion && matchStatus;
+    const matchCondition = conditionFilter === "all" || (s.condition ?? "good") === conditionFilter;
+
+    // Date range filter
+    let matchDate = true;
+    const created = new Date(s.createdAt);
+    if (dateRangeFilter === "custom") {
+      if (dateFrom) matchDate = isAfter(created, startOfDay(new Date(dateFrom)));
+      if (dateTo && matchDate) matchDate = isBefore(created, endOfDay(new Date(dateTo)));
+    } else if (dateCutoff) {
+      matchDate = isAfter(created, dateCutoff);
+    }
+
+    return matchSearch && matchRegion && matchStatus && matchCondition && matchDate;
   });
+
+  function exportCsv() {
+    const headers = ["Name", "Address", "City", "Postcode", "Region", "Status", "Condition", "Primary Contact", "Email", "Phone", "Assets", "Created"];
+    const rows = filtered.map((s) => {
+      const assetCount = instances.filter((i) => i.siteId === s.id).length;
+      return [
+        s.name, s.address, s.city, s.postcode, s.region,
+        s.status, s.condition ?? "", s.primaryContact,
+        s.primaryContactEmail, s.primaryContactPhone,
+        assetCount, format(new Date(s.createdAt), "dd/MM/yyyy"),
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enable-sites-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadTemplate() {
+    const headers = ["Name", "Address", "City", "Postcode", "Region", "Contact", "Email", "Phone"];
+    const example = ["Example Site Name", "123 Main Street", "Glasgow", "G1 1AA", "West", "Jane Smith", "jane@example.org", "0141 000 0000"];
+    const csv = [headers.join(","), example.map((v) => `"${v}"`).join(",")].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "enable-sites-import-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -150,28 +220,29 @@ export default function SitesPage() {
             {filtered.length} of {sites.length} sites
           </p>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setUploadOpen(true)}
-            >
-              <Upload className="w-3.5 h-3.5 mr-1.5" /> Import CSV
-            </Button>
-            <Button
-              size="sm"
-              className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white"
-              onClick={() => setAddOpen(true)}
-            >
-              <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Site
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                <Upload className="w-3.5 h-3.5 mr-1.5" /> Import CSV
+              </Button>
+              <Button
+                size="sm"
+                className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="w-3.5 h-3.5 mr-1.5" /> Add Site
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-44 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             placeholder="Search by name, city, postcode..."
@@ -203,6 +274,51 @@ export default function SitesPage() {
             <SelectItem value="inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={conditionFilter} onValueChange={setConditionFilter}>
+          <SelectTrigger className="h-9 text-sm w-40">
+            <SelectValue placeholder="All Conditions" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Conditions</SelectItem>
+            <SelectItem value="good">Good</SelectItem>
+            <SelectItem value="fair">Fair</SelectItem>
+            <SelectItem value="poor">Poor</SelectItem>
+            <SelectItem value="critical">Critical</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={dateRangeFilter} onValueChange={(v) => { setDateRangeFilter(v); if (v !== "custom") { setDateFrom(""); setDateTo(""); } }}>
+          <SelectTrigger className="h-9 text-sm w-44">
+            <SelectValue placeholder="All Dates" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Dates Added</SelectItem>
+            <SelectItem value="last30">Added Last 30 Days</SelectItem>
+            <SelectItem value="last90">Added Last 90 Days</SelectItem>
+            <SelectItem value="last180">Added Last 6 Months</SelectItem>
+            <SelectItem value="last365">Added Last Year</SelectItem>
+            <SelectItem value="custom">Custom Date Range</SelectItem>
+          </SelectContent>
+        </Select>
+        {dateRangeFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <Input type="date" className="h-9 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            </div>
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input type="date" className="h-9 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </div>
+        )}
+        {(search || regionFilter !== "all" || statusFilter !== "all" || conditionFilter !== "all" || dateRangeFilter !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 text-xs text-muted-foreground"
+            onClick={() => { setSearch(""); setRegionFilter("all"); setStatusFilter("all"); setConditionFilter("all"); setDateRangeFilter("all"); setDateFrom(""); setDateTo(""); }}
+          >
+            Clear filters
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -219,7 +335,7 @@ export default function SitesPage() {
               <CardContent className="p-4 flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <Badge
                         variant="outline"
                         className={
@@ -230,6 +346,15 @@ export default function SitesPage() {
                       >
                         {site.status}
                       </Badge>
+                      {site.condition && (
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${CONDITION_CONFIG[site.condition].badge}`}
+                        >
+                          <Activity className="w-2.5 h-2.5 mr-1" />
+                          {CONDITION_CONFIG[site.condition].label}
+                        </Badge>
+                      )}
                       {site.syncedFromSimpro && (
                         <Badge
                           variant="outline"
@@ -364,6 +489,10 @@ export default function SitesPage() {
                       selectedSite.status.charAt(0).toUpperCase() +
                       selectedSite.status.slice(1),
                   },
+                  ...(selectedSite.condition
+                    ? [{ label: "Condition", value: CONDITION_CONFIG[selectedSite.condition].label }]
+                    : []),
+                  { label: "Added", value: format(new Date(selectedSite.createdAt), "dd MMM yyyy") },
                   ...(selectedSite.simproId
                     ? [{ label: "SIMPRO ID", value: selectedSite.simproId }]
                     : []),
@@ -457,12 +586,9 @@ export default function SitesPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     {selectedSite.attachments.map((att) => (
-                      <a
+                      <div
                         key={att.id}
-                        href={att.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors p-3 group"
+                        className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 group"
                       >
                         <FileText className="w-4 h-4 text-[var(--brand-purple)] shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -472,8 +598,30 @@ export default function SitesPage() {
                             {att.description && ` · ${att.description}`}
                           </p>
                         </div>
-                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground group-hover:text-[var(--brand-purple)] transition-colors shrink-0" />
-                      </a>
+                        <a href={att.url} target="_blank" rel="noopener noreferrer">
+                          <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0">
+                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-[var(--brand-purple)]" />
+                          </Button>
+                        </a>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-7 h-7 shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              const updated: Site = {
+                                ...selectedSite,
+                                attachments: (selectedSite.attachments ?? []).filter((a) => a.id !== att.id),
+                              };
+                              saveSite(updated);
+                              setSelectedSite(updated);
+                              refresh();
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -591,8 +739,7 @@ export default function SitesPage() {
           <DialogHeader>
             <DialogTitle>Import Sites from CSV</DialogTitle>
             <DialogDescription>
-              CSV columns: Name, Address, City, Postcode, Region, Contact,
-              Email, Phone
+              CSV columns: Name, Address, City, Postcode, Region, Contact, Email, Phone
             </DialogDescription>
           </DialogHeader>
           <div
@@ -611,7 +758,10 @@ export default function SitesPage() {
               onChange={handleCsvUpload}
             />
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" size="sm" className="sm:mr-auto" onClick={downloadTemplate}>
+              <Download className="w-3.5 h-3.5 mr-1.5" /> Download Template
+            </Button>
             <Button variant="outline" onClick={() => setUploadOpen(false)}>
               Cancel
             </Button>
@@ -645,6 +795,7 @@ function SiteFormDialog({
     primaryContactEmail: initialData?.primaryContactEmail ?? "",
     primaryContactPhone: initialData?.primaryContactPhone ?? "",
     status: initialData?.status ?? "active",
+    condition: initialData?.condition ?? undefined,
     syncedFromSimpro: initialData?.syncedFromSimpro ?? false,
     contacts: initialData?.contacts ?? [],
   });
@@ -773,6 +924,24 @@ function SiteFormDialog({
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 flex flex-col gap-1.5">
+              <Label>Building Condition</Label>
+              <Select
+                value={form.condition ?? "none"}
+                onValueChange={(v) => set("condition", v === "none" ? undefined : v as Site["condition"])}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Not assessed" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Not assessed</SelectItem>
+                  <SelectItem value="good">Good</SelectItem>
+                  <SelectItem value="fair">Fair</SelectItem>
+                  <SelectItem value="poor">Poor</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
                 </SelectContent>
               </Select>
             </div>

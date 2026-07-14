@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/auth-context";
-import { getNotifications } from "@/lib/store";
+import { getNotifications, getApprovals } from "@/lib/store";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -21,6 +21,7 @@ import {
   Zap,
   Truck,
   ChevronDown,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +58,7 @@ const ASSET_SUB_NAV: NavItem[] = [
 
 const BOTTOM_NAV: NavItem[] = [
   { label: "Reactive Jobs", href: "/reactive-jobs", icon: Zap },
+  { label: "Approvals", href: "/approvals", icon: ClipboardCheck },
   { label: "Supply Chain", href: "/supply-chain", icon: Truck },
   { label: "Reports", href: "/reports", icon: BarChart3 },
   { label: "Notifications", href: "/notifications", icon: Bell },
@@ -120,6 +122,7 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const [assetsOpen, setAssetsOpen] = useState(
     currentPath.startsWith("/asset-types") ||
     currentPath.startsWith("/assets") ||
@@ -129,6 +132,8 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
   useEffect(() => {
     const notifications = getNotifications();
     setUnreadCount(notifications.filter((n) => !n.read).length);
+    const approvals = getApprovals();
+    setPendingApprovals(approvals.filter((a) => a.status === "pending").length);
   }, [currentPath]);
 
   // Auto-expand when navigating to an asset sub-route
@@ -213,7 +218,13 @@ export function AppSidebar({ currentPath }: AppSidebarProps) {
               key={item.href}
               item={item}
               currentPath={currentPath}
-              unreadCount={item.href === "/notifications" ? unreadCount : undefined}
+              unreadCount={
+                item.href === "/notifications"
+                  ? unreadCount
+                  : item.href === "/approvals"
+                  ? pendingApprovals
+                  : undefined
+              }
             />
           ))}
 
