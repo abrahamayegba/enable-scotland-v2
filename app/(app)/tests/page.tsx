@@ -9,6 +9,8 @@ import {
   getAssetTypes,
   getSites,
   generateId,
+  addActivityLog,
+  getActivityLogsForEntity,
 } from "@/lib/store";
 import type {
   AssetTest,
@@ -17,6 +19,7 @@ import type {
   Site,
   Attachment,
   TestResult,
+  ActivityLogEntry,
 } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
@@ -64,6 +67,8 @@ import {
   FileText,
   Image as ImageIcon,
   ChevronDown,
+  FileDown,
+  History,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -148,14 +153,35 @@ export default function TestsPage() {
   function handleSave(data: Omit<AssetTest, "id" | "createdAt" | "updatedAt">) {
     const now = new Date().toISOString();
     if (editTest) {
-      saveAssetTest({ ...editTest, ...data, updatedAt: now });
+      const prevResult = editTest.result;
+      const updated = { ...editTest, ...data, updatedAt: now };
+      saveAssetTest(updated);
+      const resultChanged = prevResult !== data.result;
+      addActivityLog({
+        id: generateId("log"),
+        entityType: "asset_test",
+        entityId: editTest.id,
+        action: resultChanged ? "status_changed" : "updated",
+        description: resultChanged
+          ? `Result changed from ${prevResult} to ${data.result} by ${user?.name}`
+          : `Test record updated by ${user?.name}`,
+        performedBy: user?.name ?? "",
+        performedByUserId: user?.id ?? "",
+        createdAt: now,
+      });
       setEditTest(null);
     } else {
-      saveAssetTest({
-        ...data,
-        id: generateId("tst"),
+      const newId = generateId("tst");
+      saveAssetTest({ ...data, id: newId, createdAt: now, updatedAt: now });
+      addActivityLog({
+        id: generateId("log"),
+        entityType: "asset_test",
+        entityId: newId,
+        action: "created",
+        description: `Test record logged by ${user?.name}`,
+        performedBy: user?.name ?? "",
+        performedByUserId: user?.id ?? "",
         createdAt: now,
-        updatedAt: now,
       });
       setAddOpen(false);
     }
@@ -165,7 +191,39 @@ export default function TestsPage() {
   function handleQuickResult(test: AssetTest, result: TestResult) {
     const now = new Date().toISOString();
     saveAssetTest({ ...test, result, updatedAt: now });
+    addActivityLog({
+      id: generateId("log"),
+      entityType: "asset_test",
+      entityId: test.id,
+      action: "status_changed",
+      description: `Result updated to ${result} by ${user?.name}`,
+      performedBy: user?.name ?? "",
+      performedByUserId: user?.id ?? "",
+      createdAt: now,
+    });
     load();
+  }
+
+  function exportCsv() {
+    const headers = ["Test ID", "Asset Serial", "Asset Type", "Site", "Tested By", "Test Date", "Result", "Next Test Due", "Notes"];
+    const rows = filtered.map((t) => {
+      const instance = instances.find((i) => i.id === t.assetInstanceId);
+      const assetType = instance ? types.find((at) => at.id === instance.assetTypeId) : undefined;
+      const site = instance ? sites.find((s) => s.id === instance.siteId) : undefined;
+      return [
+        t.id, instance?.serialNumber ?? "", assetType?.name ?? "", site?.name ?? "",
+        t.testedBy, format(new Date(t.testDate), "dd/MM/yyyy"),
+        t.result, format(new Date(t.nextTestDate), "dd/MM/yyyy"), t.notes,
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enable-asset-tests-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -178,15 +236,20 @@ export default function TestsPage() {
             {filtered.length} of {tests.length} test records
           </p>
         </div>
-        {isAdmin && (
-          <Button
-            size="sm"
-            className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="w-3.5 h-3.5 mr-1.5" /> Log Test
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <FileDown className="w-3.5 h-3.5 mr-1.5" /> Export CSV
           </Button>
-        )}
+          {isAdmin && (
+            <Button
+              size="sm"
+              className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" /> Log Test
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -559,6 +622,11 @@ function TestDetailDialog({
   const site = instance ? sites.find((s) => s.id === instance.siteId) : null;
   const rc = RESULT_CONFIG[test.result] ?? RESULT_CONFIG.pending;
   const ResultIcon = rc.icon;
+  const [activityLogs, setActivityLogs] = useState<ActivityLogEntry[]>([]);
+
+  useEffect(() => {
+    setActivityLogs(getActivityLogsForEntity("asset_test", test.id));
+  }, [test.id]);
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -652,6 +720,30 @@ function TestDetailDialog({
             </div>
           )}
         </div>
+
+          {activityLogs.length > 0 && (
+            <div className="flex flex-col gap-2 pt-1 border-t border-border/50">
+              <div className="flex items-center gap-1.5">
+                <History className="w-3.5 h-3.5 text-muted-foreground" />
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                  Activity History
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                {activityLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-purple)]/50 mt-1.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground">{log.description}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         <DialogFooter className="mt-2">
           {onEdit && (

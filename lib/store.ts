@@ -10,6 +10,9 @@ import type {
   AuthSession,
   ReactiveJob,
   SupplyChainCompany,
+  ApprovalRequest,
+  ActivityLogEntry,
+  EscalationPreferences,
 } from "./types";
 import {
   DEMO_USERS,
@@ -20,6 +23,7 @@ import {
   DEMO_NOTIFICATIONS,
   DEMO_REACTIVE_JOBS,
   DEMO_SUPPLY_CHAIN,
+  DEMO_APPROVALS,
 } from "./demo-data";
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
@@ -32,11 +36,14 @@ const KEYS = {
   NOTIFICATIONS: "es_notifications",
   REACTIVE_JOBS: "es_reactive_jobs",
   SUPPLY_CHAIN: "es_supply_chain",
+  APPROVALS: "es_approvals",
+  ACTIVITY_LOGS: "es_activity_logs",
+  ESCALATION_PREFS: "es_escalation_prefs",
   SESSION: "es_session",
   SEEDED: "es_seeded",
 };
 
-const SEED_VERSION = "v3"; // bump this to reseed all demo data
+const SEED_VERSION = "v4"; // bump this to reseed all demo data
 
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 export function seedIfNeeded(): void {
@@ -52,6 +59,7 @@ export function seedIfNeeded(): void {
   localStorage.setItem(KEYS.NOTIFICATIONS, JSON.stringify(DEMO_NOTIFICATIONS));
   localStorage.setItem(KEYS.REACTIVE_JOBS, JSON.stringify(DEMO_REACTIVE_JOBS));
   localStorage.setItem(KEYS.SUPPLY_CHAIN, JSON.stringify(DEMO_SUPPLY_CHAIN));
+  localStorage.setItem(KEYS.APPROVALS, JSON.stringify(DEMO_APPROVALS));
   localStorage.setItem(KEYS.SEEDED, SEED_VERSION);
 }
 
@@ -212,7 +220,7 @@ export function deleteAssetTest(id: string): void {
   setAll(KEYS.ASSET_TESTS, tests);
 }
 
-// ─── Notifications ───────────────────────────��────────────────────────────────
+// ─── Notifications ─────────────���─────────────��────────────────────────────────
 export function getNotifications(): Notification[] {
   return getAll<Notification>(KEYS.NOTIFICATIONS).sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -262,6 +270,71 @@ export function saveReactiveJob(job: ReactiveJob): void {
 export function deleteReactiveJob(id: string): void {
   const jobs = getReactiveJobs().filter((j) => j.id !== id);
   setAll(KEYS.REACTIVE_JOBS, jobs);
+}
+
+// ─── Approvals ────────────────────────────────────────────────────────────────
+export function getApprovals(): ApprovalRequest[] {
+  return getAll<ApprovalRequest>(KEYS.APPROVALS).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function saveApproval(approval: ApprovalRequest): void {
+  const approvals = getApprovals();
+  const idx = approvals.findIndex((a) => a.id === approval.id);
+  if (idx >= 0) approvals[idx] = approval;
+  else approvals.push(approval);
+  setAll(KEYS.APPROVALS, approvals);
+}
+
+export function deleteApproval(id: string): void {
+  const approvals = getApprovals().filter((a) => a.id !== id);
+  setAll(KEYS.APPROVALS, approvals);
+}
+
+// ─── Activity Logs ────────────────────────────────────────────────────────────
+export function getActivityLogs(): ActivityLogEntry[] {
+  return getAll<ActivityLogEntry>(KEYS.ACTIVITY_LOGS).sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export function getActivityLogsForEntity(entityType: string, entityId: string): ActivityLogEntry[] {
+  return getActivityLogs().filter(
+    (e) => e.entityType === entityType && e.entityId === entityId
+  );
+}
+
+export function addActivityLog(entry: ActivityLogEntry): void {
+  const logs = getActivityLogs();
+  logs.unshift(entry);
+  setAll(KEYS.ACTIVITY_LOGS, logs);
+}
+
+// ─── Escalation Preferences ───────────────────────────────────────────────────
+const DEFAULT_ESCALATION_PREFS: EscalationPreferences = {
+  testDueLeadDays: 14,
+  testOverdueRepeatDays: 7,
+  leaseDueLeadDays: 90,
+  complianceDueLeadDays: 30,
+  emailNotifications: true,
+  portalNotifications: true,
+};
+
+export function getEscalationPrefs(): EscalationPreferences {
+  if (typeof window === "undefined") return DEFAULT_ESCALATION_PREFS;
+  try {
+    const stored = localStorage.getItem(KEYS.ESCALATION_PREFS);
+    if (!stored) return DEFAULT_ESCALATION_PREFS;
+    return { ...DEFAULT_ESCALATION_PREFS, ...JSON.parse(stored) };
+  } catch {
+    return DEFAULT_ESCALATION_PREFS;
+  }
+}
+
+export function saveEscalationPrefs(prefs: EscalationPreferences): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(KEYS.ESCALATION_PREFS, JSON.stringify(prefs));
 }
 
 // Public portal submission — no auth required, creates job with source="portal"

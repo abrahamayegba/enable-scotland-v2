@@ -1,20 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCurrentUser, saveUser } from "@/lib/store";
+import { getCurrentUser, saveUser, getEscalationPrefs, saveEscalationPrefs } from "@/lib/store";
 import { useAuth } from "@/contexts/auth-context";
-import type { User } from "@/lib/types";
+import type { User, EscalationPreferences } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Alert, AlertDescription,
 } from "@/components/ui/alert";
 import {
-  User as UserIcon, Mail, Lock, ShieldCheck, CheckCircle2, AlertCircle,
+  User as UserIcon, Mail, Lock, ShieldCheck, CheckCircle2, AlertCircle, Bell,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -29,9 +30,12 @@ export default function SettingsPage() {
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pwMsg, setPwMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [escalationPrefs, setEscalationPrefs] = useState<EscalationPreferences | null>(null);
+  const [escalationMsg, setEscalationMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (user) { setName(user.name); setEmail(user.email); }
+    setEscalationPrefs(getEscalationPrefs());
   }, [user]);
 
   function handleProfileSave(e: React.FormEvent) {
@@ -67,6 +71,14 @@ export default function SettingsPage() {
     refresh();
     setCurrentPw(""); setNewPw(""); setConfirmPw("");
     setPwMsg({ type: "success", text: "Password changed successfully." });
+  }
+
+  function handleEscalationSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!escalationPrefs) return;
+    saveEscalationPrefs(escalationPrefs);
+    setEscalationMsg({ type: "success", text: "Notification preferences saved." });
+    setTimeout(() => setEscalationMsg(null), 3000);
   }
 
   if (!user) return null;
@@ -174,6 +186,111 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Notification / Escalation Preferences */}
+      {escalationPrefs && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Bell className="w-4 h-4 text-[var(--brand-purple)]" /> Notification &amp; Escalation Preferences
+            </CardTitle>
+            <CardDescription>Configure when alerts are sent for tests, leases, and compliance renewals.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleEscalationSave} className="flex flex-col gap-5">
+              {escalationMsg && (
+                <Alert variant={escalationMsg.type === "error" ? "destructive" : "default"} className="py-2">
+                  {escalationMsg.type === "success" ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  <AlertDescription>{escalationMsg.text}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="testDueLead">Test Due Lead Days</Label>
+                  <p className="text-xs text-muted-foreground">How many days before a test is due to send an alert.</p>
+                  <Input
+                    id="testDueLead"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={escalationPrefs.testDueLeadDays}
+                    onChange={(e) => setEscalationPrefs((p) => p ? { ...p, testDueLeadDays: Number(e.target.value) } : p)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="testOverdueRepeat">Overdue Repeat Interval (Days)</Label>
+                  <p className="text-xs text-muted-foreground">How often to repeat alerts for overdue tests.</p>
+                  <Input
+                    id="testOverdueRepeat"
+                    type="number"
+                    min={1}
+                    max={90}
+                    value={escalationPrefs.testOverdueRepeatDays}
+                    onChange={(e) => setEscalationPrefs((p) => p ? { ...p, testOverdueRepeatDays: Number(e.target.value) } : p)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="leaseDueLead">Lease Expiry Lead Days</Label>
+                  <p className="text-xs text-muted-foreground">How many days before a lease expires to send an alert.</p>
+                  <Input
+                    id="leaseDueLead"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={escalationPrefs.leaseDueLeadDays}
+                    onChange={(e) => setEscalationPrefs((p) => p ? { ...p, leaseDueLeadDays: Number(e.target.value) } : p)}
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="complianceDueLead">Compliance Renewal Lead Days</Label>
+                  <p className="text-xs text-muted-foreground">How many days before a compliance renewal to alert.</p>
+                  <Input
+                    id="complianceDueLead"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={escalationPrefs.complianceDueLeadDays}
+                    onChange={(e) => setEscalationPrefs((p) => p ? { ...p, complianceDueLeadDays: Number(e.target.value) } : p)}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-col gap-3">
+                <p className="text-sm font-medium">Delivery Channels</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm">Portal Notifications</p>
+                    <p className="text-xs text-muted-foreground">Show alerts in the portal notification centre</p>
+                  </div>
+                  <Switch
+                    checked={escalationPrefs.portalNotifications}
+                    onCheckedChange={(v) => setEscalationPrefs((p) => p ? { ...p, portalNotifications: v } : p)}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm">Email Notifications</p>
+                    <p className="text-xs text-muted-foreground">Send email alerts to the responsible contact</p>
+                  </div>
+                  <Switch
+                    checked={escalationPrefs.emailNotifications}
+                    onCheckedChange={(v) => setEscalationPrefs((p) => p ? { ...p, emailNotifications: v } : p)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="submit" size="sm" className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white">
+                  Save Preferences
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Account info */}
       <Card>

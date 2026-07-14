@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import {
   BarChart3, ExternalLink, TrendingUp, TrendingDown, CheckCircle2,
-  XCircle, Clock, Building2, Filter, RefreshCw,
+  XCircle, Clock, Building2, Filter, RefreshCw, FileDown,
 } from "lucide-react";
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, isPast, addDays } from "date-fns";
 
@@ -143,6 +143,29 @@ export default function ReportsPage() {
     { name: "Pending", value: pendingCount, color: AMBER },
   ].filter((d) => d.value > 0);
 
+  function exportCsv() {
+    const headers = ["Test ID", "Asset Serial", "Asset Type", "Site", "Tested By", "Test Date", "Result", "Next Test Date", "Certificate No", "Notes"];
+    const rows = periodTests.map((t) => {
+      const inst = filteredInstances.find((i) => i.id === t.assetInstanceId);
+      const type = inst ? types.find((at) => at.id === inst.assetTypeId) : undefined;
+      const site = inst ? sites.find((s) => s.id === inst.siteId) : undefined;
+      return [
+        t.id, inst?.serialNumber ?? "", type?.name ?? "", site?.name ?? "",
+        t.testedBy, format(new Date(t.testDate), "dd/MM/yyyy"),
+        t.result, format(new Date(t.nextTestDate), "dd/MM/yyyy"),
+        t.certificateNumber ?? "", t.notes,
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enable-test-report-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -153,17 +176,22 @@ export default function ReportsPage() {
             Asset test compliance overview for Enable Scotland
           </p>
         </div>
-        {/* Metabase BI button */}
-        <a
-          href="#"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--brand-purple)] text-white text-sm font-medium hover:bg-[var(--brand-purple-dark)] transition-colors shadow-sm shrink-0"
-        >
-          <BarChart3 className="w-4 h-4" />
-          Open in Metabase BI
-          <ExternalLink className="w-3.5 h-3.5 opacity-70" />
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <FileDown className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+          </Button>
+          {/* Metabase BI button */}
+          <a
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--brand-purple)] text-white text-sm font-medium hover:bg-[var(--brand-purple-dark)] transition-colors shadow-sm shrink-0"
+          >
+            <BarChart3 className="w-4 h-4" />
+            Open in Metabase BI
+            <ExternalLink className="w-3.5 h-3.5 opacity-70" />
+          </a>
+        </div>
       </div>
 
       {/* Filters */}

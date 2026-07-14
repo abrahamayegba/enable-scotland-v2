@@ -7,8 +7,10 @@ import {
   getSites,
   getSupplyChain,
   generateId,
+  addActivityLog,
+  getActivityLogsForEntity,
 } from "@/lib/store";
-import type { ReactiveJob, Site, SupplyChainCompany } from "@/lib/types";
+import type { ReactiveJob, Site, SupplyChainCompany, ActivityLogEntry } from "@/lib/types";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +64,7 @@ import {
   QrCode,
   Download,
   Send,
+  FileDown,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -170,6 +173,27 @@ export default function ReactiveJobsPage() {
       ? `${window.location.origin}/submit-job`
       : "/submit-job";
 
+  function exportCsv() {
+    const headers = ["ID", "Title", "Site", "Status", "Priority", "Source", "Assigned To", "Contact Name", "Contact Email", "Created", "Updated"];
+    const rows = filtered.map((j) => {
+      const site = sites.find((s) => s.id === j.siteId);
+      return [
+        j.id, j.title, site?.name ?? "", j.status, j.priority, j.source,
+        j.assignedTo ?? "", j.contactName ?? "", j.contactEmail ?? "",
+        format(new Date(j.createdAt), "dd/MM/yyyy"),
+        format(new Date(j.updatedAt), "dd/MM/yyyy"),
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",");
+    });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `enable-reactive-jobs-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleCopyLink() {
     navigator.clipboard.writeText(portalUrl).then(() => {
       setCopyTooltip(true);
@@ -212,16 +236,21 @@ export default function ReactiveJobsPage() {
             Unplanned maintenance requests — {jobs.length} total
           </p>
         </div>
-        {isAdmin && (
-          <Button
-            size="sm"
-            className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white shrink-0"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
-            New Job
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={exportCsv}>
+            <FileDown className="w-3.5 h-3.5 mr-1.5" /> Export CSV
           </Button>
-        )}
+          {isAdmin && (
+            <Button
+              size="sm"
+              className="bg-[var(--brand-purple)] hover:bg-[var(--brand-purple-dark)] text-white shrink-0"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Job
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ── Stats row ── */}
@@ -595,16 +624,23 @@ export default function ReactiveJobsPage() {
         sites={sites}
         companies={companies}
         user={user}
-        onSave={(data) => {
-          saveReactiveJob({
-            ...data,
-            id: generateId("job"),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-          refresh();
-          setAddOpen(false);
-        }}
+          onSave={(data) => {
+            const now = new Date().toISOString();
+            const newJob: ReactiveJob = { ...data, id: generateId("job"), createdAt: now, updatedAt: now };
+            saveReactiveJob(newJob);
+            addActivityLog({
+              id: generateId("log"),
+              entityType: "reactive_job",
+              entityId: newJob.id,
+              action: "created",
+              description: `Job created by ${user?.name}`,
+              performedBy: user?.name ?? "",
+              performedByUserId: user?.id ?? "",
+              createdAt: now,
+            });
+            refresh();
+            setAddOpen(false);
+          }}
       />
 
       {/* ── Edit dialog ── */}
@@ -617,10 +653,22 @@ export default function ReactiveJobsPage() {
           user={user}
           initialData={editJob}
           onSave={(data) => {
-            saveReactiveJob({
-              ...editJob,
-              ...data,
-              updatedAt: new Date().toISOString(),
+            const now = new Date().toISOString();
+            const prevStatus = editJob.status;
+            const updated: ReactiveJob = { ...editJob, ...data, updatedAt: now };
+            saveReactiveJob(updated);
+            const statusChanged = prevStatus !== data.status;
+            addActivityLog({
+              id: generateId("log"),
+              entityType: "reactive_job",
+              entityId: editJob.id,
+              action: statusChanged ? "status_changed" : "updated",
+              description: statusChanged
+                ? `Status changed from ${prevStatus} to ${data.status} by ${user?.name}`
+                : `Job details updated by ${user?.name}`,
+              performedBy: user?.name ?? "",
+              performedByUserId: user?.id ?? "",
+              createdAt: now,
             });
             refresh();
             setEditJob(null);
@@ -752,6 +800,11 @@ function JobDetailDialog({
     job.source === "portal" &&
     (job.contactName || job.contactPhone || job.contactEmail);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogEntry[]>([]);
+
+  useEffect(() => {
+    setActivityLogs(getActivityLogsForEntity("reactive_job", job.id));
+  }, [job.id]);
   const jobLink = typeof window !== "undefined"
     ? `${window.location.origin}/jobs/${job.id}/close`
     : `/jobs/${job.id}/close`;
@@ -940,6 +993,31 @@ function JobDetailDialog({
         </div>
 
         <Separator />
+
+        {/* Activity Log */}
+        {activityLogs.length > 0 && (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Activity Log
+              </p>
+              <div className="flex flex-col gap-2">
+                {activityLogs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-purple)]/50 mt-1.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-foreground">{log.description}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Separator />
+          </>
+        )}
 
         {/* Job Share Link */}
         <div className="flex flex-col gap-2">
